@@ -12,8 +12,8 @@ services:
       # Web 控制台端口
       - "${WEB_PORT:-5000}:5000"
     environment:
-      # 必填：美团 Token（从抓包获取）
-      - MEITUAN_TOKEN=${MEITUAN_TOKEN}
+      # 可选：美团 Token（也可通过 Web 控制台添加）
+      - MEITUAN_TOKEN=${MEITUAN_TOKEN:-}
       # 可选：定时执行的小时，默认 8,14（北京时间 8:00 和 14:00）
       - CRON_HOURS=${CRON_HOURS:-8,14}
       # 可选：启动时是否立即执行一次，设为 true 立即执行
@@ -22,6 +22,8 @@ services:
       - ENABLE_WEB=${ENABLE_WEB:-true}
       # 可选：Web 控制台端口，默认 5000
       - WEB_PORT=${WEB_PORT:-5000}
+      # 可选：Web 控制台登录密码，默认 admin123
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
     volumes:
       # 持久化日志
       - ./logs:/var/log/meituan

@@ -6,9 +6,15 @@
 
 - 自动领取外卖红包
 - 自动领取团购红包
-- 支持多账号（用 `&` 分隔）
+- 支持多账号管理
 - 支持自定义执行时间
-- **Web 控制台**：查看日志、手动触发执行
+- **Web 控制台**：
+  - 登录认证保护
+  - 在线添加/管理 Token
+  - 从美团 URL/Cookie 自动提取 Token
+  - 查看领取历史和优惠券详情
+  - 实时日志查看
+  - 手动触发执行
 - Docker 一键部署，支持 amd64/arm64
 - 支持日志持久化
 
@@ -27,13 +33,13 @@ docker run -d \
   --name meituan-coupons \
   --restart unless-stopped \
   -p 5000:5000 \
-  -e MEITUAN_TOKEN="你的token值" \
-  -e RUN_ON_START="true" \
+  -e ADMIN_PASSWORD="你的登录密码" \
+  -e RUN_ON_START="false" \
   -v $(pwd)/logs:/var/log/meituan \
   ghcr.io/sortbyiky/meituan-coupons:latest
 ```
 
-启动后访问 http://localhost:5000 打开 Web 控制台。
+启动后访问 http://localhost:5000 打开 Web 控制台，使用设置的密码登录后添加 Token。
 
 ### 方式二：Docker Compose（推荐）
 
@@ -53,20 +59,27 @@ services:
     ports:
       - "${WEB_PORT:-5000}:5000"
     environment:
-      - MEITUAN_TOKEN=${MEITUAN_TOKEN}
+      - MEITUAN_TOKEN=${MEITUAN_TOKEN:-}
       - CRON_HOURS=${CRON_HOURS:-8,14}
-      - RUN_ON_START=${RUN_ON_START:-true}
+      - RUN_ON_START=${RUN_ON_START:-false}
       - ENABLE_WEB=${ENABLE_WEB:-true}
       - WEB_PORT=${WEB_PORT:-5000}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
     volumes:
       - ./logs:/var/log/meituan
 EOF
 
 # 创建 .env 配置文件
 cat > .env << EOF
-MEITUAN_TOKEN=你的token值
+# Web 控制台登录密码（必须修改！）
+ADMIN_PASSWORD=你的登录密码
+
+# 可选：美团 Token（也可通过 Web 控制台添加）
+MEITUAN_TOKEN=
+
+# 定时执行时间
 CRON_HOURS=8,14
-RUN_ON_START=true
+RUN_ON_START=false
 ENABLE_WEB=true
 WEB_PORT=5000
 EOF
@@ -85,35 +98,77 @@ docker-compose up -d
 ### 方式三：一键部署脚本
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sortbyiky/meituan-coupons/main/install.sh | bash -s -- "你的token值"
+# 只设置登录密码（之后通过 Web 控制台添加 Token）
+curl -fsSL https://raw.githubusercontent.com/sortbyiky/meituan-coupons/main/install.sh | bash -s -- "你的登录密码"
+
+# 同时设置登录密码和 Token
+curl -fsSL https://raw.githubusercontent.com/sortbyiky/meituan-coupons/main/install.sh | bash -s -- "你的登录密码" "你的token值"
 ```
 
 ## Web 控制台
 
 部署后访问 `http://服务器IP:5000` 即可打开 Web 控制台。
 
+### 登录认证
+
+Web 控制台需要密码登录，默认密码为 `admin123`，**强烈建议修改**。
+
+通过环境变量 `ADMIN_PASSWORD` 设置登录密码。
+
 ### 功能
 
-- **查看执行状态**：当前状态、上次执行时间、执行结果
-- **查看日志**：实时查看领取日志，支持自动刷新
-- **手动执行**：点击按钮立即执行一次领取
-- **清空日志**：清除历史日志记录
+- **Token 管理**：
+  - 在线添加、编辑、删除 Token
+  - 支持直接粘贴美团 URL 或 Cookie，自动提取 Token
+  - 支持为每个 Token 添加备注（如账号名称）
 
-### 截图
+- **领取历史**：
+  - 查看每次领取的详细记录
+  - 显示领取的优惠券名称、金额、有效期等
 
-Web 控制台界面简洁美观，支持：
-- 实时状态显示
-- 日志语法高亮（成功/失败/信息）
-- 自动刷新（状态 5 秒、日志 10 秒）
+- **实时日志**：
+  - 查看执行日志，支持自动刷新
+  - 日志语法高亮（成功/失败/信息）
+
+- **手动执行**：
+  - 点击按钮立即执行一次领取
+  - 清空日志记录
+
+### Token 输入说明
+
+添加 Token 时支持多种输入格式：
+
+1. **直接粘贴 Token**：
+   ```
+   AgGYIaHEzI-14y0HtXaEk2ugpWQkAF-chI_TJ8W51Cbj...
+   ```
+
+2. **粘贴 Cookie 字符串**：
+   ```
+   token=AgGYIaHEzI-14y0HtXaEk2ugpWQkAF-chI...; other=xxx
+   ```
+   系统会自动提取 `token=` 后面的值。
+
+3. **粘贴完整 URL**：
+   ```
+   https://h5.waimai.meituan.com/...?token=AgGYIaHEzI...
+   ```
+   系统会自动从 URL 参数中提取 Token。
+
+### 界面特点
+
 - 响应式设计，支持手机访问
+- 自动刷新（状态 5 秒、日志 10 秒）
+- 简洁美观的界面
 
 ## 环境变量说明
 
 | 变量名 | 必填 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `MEITUAN_TOKEN` | 是 | - | 美团 Token，多账号用 `&` 分隔 |
+| `ADMIN_PASSWORD` | 建议 | `admin123` | Web 控制台登录密码，**强烈建议修改** |
+| `MEITUAN_TOKEN` | 否 | - | 美团 Token（也可通过 Web 控制台添加） |
 | `CRON_HOURS` | 否 | `8,14` | 定时执行的小时（北京时间） |
-| `RUN_ON_START` | 否 | `true` | 启动时是否立即执行一次 |
+| `RUN_ON_START` | 否 | `false` | 启动时是否立即执行一次 |
 | `ENABLE_WEB` | 否 | `true` | 是否启用 Web 控制台 |
 | `WEB_PORT` | 否 | `5000` | Web 控制台端口 |
 
@@ -227,14 +282,17 @@ A: 可能原因：
 ### Q: 如何更新 Token？
 
 A:
+
+**方式一（推荐）：通过 Web 控制台**
+1. 访问 Web 控制台并登录
+2. 在 Token 管理页面添加、编辑或删除 Token
+3. 支持直接粘贴美团 URL 或 Cookie，自动提取
+
+**方式二：修改环境变量**
 ```bash
-# 方式一：修改 .env 文件后重启
+# 修改 .env 文件后重启
 vim .env  # 修改 MEITUAN_TOKEN
 docker-compose restart
-
-# 方式二：直接用新 Token 重建容器
-docker rm -f meituan-coupons
-docker run -d --name meituan-coupons ... -e MEITUAN_TOKEN="新token" ...
 ```
 
 ### Q: 支持哪些红包？

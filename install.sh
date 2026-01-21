@@ -20,14 +20,19 @@ echo "=================================================="
 echo -e "${NC}"
 
 # 检查参数
-TOKEN="$1"
-if [ -z "$TOKEN" ]; then
-    echo -e "${YELLOW}用法: $0 <你的美团Token>${NC}"
+PASSWORD="$1"
+TOKEN="$2"
+
+if [ -z "$PASSWORD" ]; then
+    echo -e "${YELLOW}用法: $0 <登录密码> [美团Token]${NC}"
     echo ""
-    echo "Token 获取方法:"
-    echo "1. 打开 Chrome，按 F12 打开开发者工具"
-    echo "2. 访问 https://h5.waimai.meituan.com"
-    echo "3. 在 Network 中找到请求，复制 Cookie 中的 token 值"
+    echo "参数说明:"
+    echo "  登录密码: Web 控制台的登录密码（必填）"
+    echo "  美团Token: 可选，也可以部署后通过 Web 控制台添加"
+    echo ""
+    echo "示例:"
+    echo "  $0 mypassword123"
+    echo "  $0 mypassword123 AgGYIaHEzI-14y0HtXaEk2ugpWQkAF..."
     echo ""
     exit 1
 fi
@@ -48,15 +53,26 @@ cd "$INSTALL_DIR"
 
 # 创建配置文件
 echo -e "${YELLOW}[3/4] 创建配置文件...${NC}"
+
+# 设置 RUN_ON_START
+if [ -n "$TOKEN" ]; then
+    RUN_ON_START="true"
+else
+    RUN_ON_START="false"
+fi
+
 cat > "$INSTALL_DIR/.env" << EOF
-# 美团 Token（必填）
+# Web 控制台登录密码
+ADMIN_PASSWORD=$PASSWORD
+
+# 美团 Token（可选，也可通过 Web 控制台添加）
 MEITUAN_TOKEN=$TOKEN
 
 # 定时执行时间（小时），默认 8:00 和 14:00
 CRON_HOURS=8,14
 
 # 启动时立即执行一次
-RUN_ON_START=true
+RUN_ON_START=$RUN_ON_START
 
 # Web 控制台配置
 ENABLE_WEB=true
@@ -73,9 +89,10 @@ services:
     ports:
       - "\${WEB_PORT:-5000}:5000"
     environment:
-      - MEITUAN_TOKEN=\${MEITUAN_TOKEN}
+      - ADMIN_PASSWORD=\${ADMIN_PASSWORD:-admin123}
+      - MEITUAN_TOKEN=\${MEITUAN_TOKEN:-}
       - CRON_HOURS=\${CRON_HOURS:-8,14}
-      - RUN_ON_START=\${RUN_ON_START:-true}
+      - RUN_ON_START=\${RUN_ON_START:-false}
       - ENABLE_WEB=\${ENABLE_WEB:-true}
       - WEB_PORT=\${WEB_PORT:-5000}
     volumes:
@@ -105,9 +122,10 @@ else
         --name meituan-coupons \
         --restart unless-stopped \
         -p 5000:5000 \
+        -e ADMIN_PASSWORD="$PASSWORD" \
         -e MEITUAN_TOKEN="$TOKEN" \
         -e CRON_HOURS="8,14" \
-        -e RUN_ON_START="true" \
+        -e RUN_ON_START="$RUN_ON_START" \
         -e ENABLE_WEB="true" \
         -e WEB_PORT="5000" \
         -v "$INSTALL_DIR/logs:/var/log/meituan" \
@@ -123,15 +141,18 @@ echo "安装目录: $INSTALL_DIR"
 echo "镜像地址: $IMAGE"
 echo ""
 echo -e "${GREEN}Web 控制台: http://localhost:5000${NC}"
+echo -e "${YELLOW}登录密码: $PASSWORD${NC}"
+echo ""
+if [ -z "$TOKEN" ]; then
+    echo -e "${YELLOW}提示: 请登录 Web 控制台添加美团 Token${NC}"
+fi
 echo ""
 echo "常用命令:"
 echo "  查看日志:   docker logs -f meituan-coupons"
 echo "  查看状态:   docker ps | grep meituan"
-echo "  手动执行:   docker exec meituan-coupons python /app/meituan.py"
 echo "  停止服务:   docker stop meituan-coupons"
 echo "  更新镜像:   docker pull $IMAGE && docker-compose -f $INSTALL_DIR/docker-compose.yml up -d"
-echo "  更新Token:  编辑 $INSTALL_DIR/.env 后执行 docker-compose restart"
 echo ""
 echo -e "${YELLOW}提示: 默认每天 8:00 和 14:00 自动执行${NC}"
-echo -e "${YELLOW}提示: Web 控制台可查看日志和手动触发执行${NC}"
+echo -e "${YELLOW}提示: 可通过 Web 控制台管理 Token、查看领取历史${NC}"
 echo ""
