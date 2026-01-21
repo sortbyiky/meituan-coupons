@@ -8,68 +8,75 @@
 - 自动领取团购红包
 - 支持多账号（用 `&` 分隔）
 - 支持自定义执行时间
-- Docker 一键部署
+- Docker 一键部署，支持 amd64/arm64
 - 支持日志持久化
+
+## 镜像地址
+
+```
+ghcr.io/sortbyiky/meituan-coupons:latest
+```
 
 ## 快速开始
 
-### 方式一：Docker Compose（推荐）
-
-1. **克隆项目**
-
-```bash
-git clone https://github.com/sortbyiky/meituan-coupons.git
-cd meituan-coupons
-```
-
-2. **配置 Token**
-
-创建 `.env` 文件：
-
-```bash
-# 必填：你的美团 Token
-MEITUAN_TOKEN=你的token值
-
-# 可选：定时执行时间（小时），默认 8,14
-CRON_HOURS=8,14
-
-# 可选：启动时立即执行一次
-RUN_ON_START=true
-```
-
-3. **启动服务**
-
-```bash
-docker-compose up -d
-```
-
-4. **查看日志**
-
-```bash
-# 查看容器日志
-docker logs -f meituan-coupons
-
-# 查看执行日志
-cat logs/coupons.log
-```
-
-### 方式二：Docker 命令行
+### 方式一：Docker 命令行（最简单）
 
 ```bash
 docker run -d \
   --name meituan-coupons \
   --restart unless-stopped \
   -e MEITUAN_TOKEN="你的token值" \
-  -e CRON_HOURS="8,14" \
   -e RUN_ON_START="true" \
   -v $(pwd)/logs:/var/log/meituan \
-  $(docker build -q .)
+  ghcr.io/sortbyiky/meituan-coupons:latest
+```
+
+### 方式二：Docker Compose（推荐）
+
+1. **创建目录和配置文件**
+
+```bash
+mkdir -p meituan-coupons && cd meituan-coupons
+
+# 创建 docker-compose.yml
+cat > docker-compose.yml << 'EOF'
+version: '3.8'
+services:
+  meituan-coupons:
+    image: ghcr.io/sortbyiky/meituan-coupons:latest
+    container_name: meituan-coupons
+    restart: unless-stopped
+    environment:
+      - MEITUAN_TOKEN=${MEITUAN_TOKEN}
+      - CRON_HOURS=${CRON_HOURS:-8,14}
+      - RUN_ON_START=${RUN_ON_START:-true}
+    volumes:
+      - ./logs:/var/log/meituan
+EOF
+
+# 创建 .env 配置文件
+cat > .env << EOF
+MEITUAN_TOKEN=你的token值
+CRON_HOURS=8,14
+RUN_ON_START=true
+EOF
+```
+
+2. **启动服务**
+
+```bash
+docker-compose up -d
+```
+
+3. **查看日志**
+
+```bash
+docker logs -f meituan-coupons
 ```
 
 ### 方式三：一键部署脚本
 
 ```bash
-# 下载并运行
 curl -fsSL https://raw.githubusercontent.com/sortbyiky/meituan-coupons/main/install.sh | bash -s -- "你的token值"
 ```
 
@@ -116,12 +123,12 @@ Cookie: token=AgGYIaHEzI-14y0HtXaEk2ugpWQkAF-chI...
 
 **Cookie 示例**：
 ```
-token=AgGYIaHEzI-14y0HtXaEk2ugpWQkAF-chI_TJ8W51CbjmnaK8E8akf7IFnJGXU7gL2KGcU7FB2Sp0gAAAADlMAAACNSA1wH7Ff0yhfqXaSMsNY8TMahfSjy2ULwxho_vtQU9VpbG708c8p_9EdmhGvY-; other=xxx
+token=AgGYIaHEzI-14y0HtXaEk2ugpWQkAF-chI_TJ8W51Cbj...; other=xxx
 ```
 
 你需要的是：
 ```
-AgGYIaHEzI-14y0HtXaEk2ugpWQkAF-chI_TJ8W51CbjmnaK8E8akf7IFnJGXU7gL2KGcU7FB2Sp0gAAAADlMAAACNSA1wH7Ff0yhfqXaSMsNY8TMahfSjy2ULwxho_vtQU9VpbG708c8p_9EdmhGvY-
+AgGYIaHEzI-14y0HtXaEk2ugpWQkAF-chI_TJ8W51Cbj...
 ```
 
 ### 方法三：小程序开发者工具
@@ -142,26 +149,27 @@ MEITUAN_TOKEN="token1&token2&token3"
 ## 常用命令
 
 ```bash
-# 启动服务
-docker-compose up -d
-
-# 停止服务
-docker-compose down
-
-# 重启服务
-docker-compose restart
-
-# 查看状态
-docker-compose ps
+# 查看运行状态
+docker ps | grep meituan
 
 # 查看日志
-docker-compose logs -f
+docker logs -f meituan-coupons
 
 # 手动执行一次
 docker exec meituan-coupons python /app/meituan.py
 
-# 更新到最新版本
-git pull && docker-compose up -d --build
+# 停止服务
+docker stop meituan-coupons
+
+# 删除容器
+docker rm meituan-coupons
+
+# 更新镜像
+docker pull ghcr.io/sortbyiky/meituan-coupons:latest
+docker-compose up -d
+
+# 查看执行记录
+cat logs/coupons.log
 ```
 
 ## 执行时间说明
@@ -178,20 +186,26 @@ git pull && docker-compose up -d --build
 
 ### Q: Token 多久失效？
 
-A: Token 有效期约 30 天，失效后需要重新获取。
+A: Token 有效期约 30 天，失效后需要重新获取并更新环境变量。
 
 ### Q: 提示"请求异常"怎么办？
 
-A: 可能是网络问题或 Token 失效，检查：
-1. 服务器是否能访问美团（需要国内服务器）
-2. Token 是否正确、是否过期
-3. 查看详细日志 `logs/coupons.log`
+A: 可能原因：
+1. **服务器在国外** - 美团 API 屏蔽海外 IP，需要使用国内服务器
+2. **Token 失效** - 重新获取 Token
+3. **网络问题** - 检查服务器网络
 
-### Q: 如何查看领取了哪些红包？
+### Q: 如何更新 Token？
 
-A: 查看日志文件：
+A:
 ```bash
-cat logs/coupons.log
+# 方式一：修改 .env 文件后重启
+vim .env  # 修改 MEITUAN_TOKEN
+docker-compose restart
+
+# 方式二：直接用新 Token 重建容器
+docker rm -f meituan-coupons
+docker run -d --name meituan-coupons ... -e MEITUAN_TOKEN="新token" ...
 ```
 
 ### Q: 支持哪些红包？
@@ -202,6 +216,10 @@ A: 支持以下类型：
 - 闪购红包（水果、零食、便利店等）
 - 团购红包
 - 各类商家粮票
+
+### Q: 支持哪些架构？
+
+A: 镜像支持 `linux/amd64` 和 `linux/arm64`，可在 x86 服务器和 ARM 服务器（如树莓派）上运行。
 
 ## 免责声明
 

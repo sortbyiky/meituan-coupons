@@ -2,7 +2,10 @@ version: '3.8'
 
 services:
   meituan-coupons:
-    build: .
+    # 使用预构建镜像（推荐）
+    image: ghcr.io/sortbyiky/meituan-coupons:latest
+    # 或者本地构建：注释上面的 image，取消下面的注释
+    # build: .
     container_name: meituan-coupons
     restart: unless-stopped
     environment:
