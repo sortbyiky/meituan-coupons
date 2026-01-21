@@ -1,0 +1,34 @@
+name: 美团红包自动领取
+
+on:
+  schedule:
+    # 每天 0:00 和 6:00 执行 (UTC 时间，北京时间 8:00 和 14:00)
+    - cron: '0 0,6 * * *'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: '手动触发原因'
+        required: false
+        default: '手动测试'
+
+jobs:
+  grab-coupons:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: pip install requests
+
+      - name: 领取红包
+        env:
+          MEITUAN_TOKEN: ${{ secrets.MEITUAN_TOKEN }}
+        run: python meituan.py
