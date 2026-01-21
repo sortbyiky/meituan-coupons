@@ -4,11 +4,10 @@
 
 LOG_FILE="/var/log/meituan/coupons.log"
 
-# 检查 Token
+# Token 可通过 Web 控制台添加，不再强制要求环境变量
 if [ -z "$MEITUAN_TOKEN" ]; then
-    echo "错误: 未设置 MEITUAN_TOKEN 环境变量"
-    echo "请使用 -e MEITUAN_TOKEN=你的token 参数启动容器"
-    exit 1
+    echo "提示: 未设置 MEITUAN_TOKEN 环境变量"
+    echo "您可以通过 Web 控制台添加和管理 Token"
 fi
 
 echo "=================================================="

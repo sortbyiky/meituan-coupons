@@ -18,12 +18,13 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY meituan.py .
+COPY models.py .
 COPY web.py .
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
-# 创建日志目录
-RUN mkdir -p /var/log/meituan
+# 创建日志和数据目录
+RUN mkdir -p /var/log/meituan /app/data
 
 # Web 控制台端口
 EXPOSE 5000

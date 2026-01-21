@@ -1,22 +1,39 @@
 # 美团外卖红包自动领取
 
-基于 Docker 的美团外卖红包自动领取工具，支持一键部署到服务器，内置 Web 控制台。
+基于 Docker 的美团外卖红包自动领取工具，支持一键部署到服务器，内置企业级 Web 控制台。
 
 ## 功能特性
 
+### 核心功能
 - 自动领取外卖红包
 - 自动领取团购红包
 - 支持多账号管理
 - 支持自定义执行时间
-- **Web 控制台**：
-  - 登录认证保护
-  - 在线添加/管理 Token
-  - 从美团 URL/Cookie 自动提取 Token
-  - 查看领取历史和优惠券详情
-  - 实时日志查看
-  - 手动触发执行
 - Docker 一键部署，支持 amd64/arm64
-- 支持日志持久化
+- 支持数据持久化
+
+### 企业级 Web 控制台
+
+**多标签页管理界面**：
+
+| 标签页 | 功能 |
+|--------|------|
+| 📊 控制台 | 系统状态概览、快速操作、今日统计 |
+| 👤 账号管理 | Token 添加/编辑/删除、状态监控 |
+| 📋 领取历史 | 详细领取记录、优惠券详情 |
+| 📝 系统日志 | 操作日志、错误追踪 |
+| ⚙️ 系统设置 | 定时任务、密码修改 |
+| ❓ 帮助教程 | Token 获取详细教程 |
+
+**主要特性**：
+- 登录认证保护（支持密码修改）
+- 在线添加/管理 Token
+- 从美团 URL/Cookie 自动提取 Token
+- 查看领取历史和优惠券详情
+- 实时日志查看
+- 手动触发执行
+- SQLite 数据库持久化
+- 现代化 UI 设计（TailwindCSS + Remix Icons）
 
 ## 镜像地址
 
@@ -34,8 +51,8 @@ docker run -d \
   --restart unless-stopped \
   -p 5000:5000 \
   -e ADMIN_PASSWORD="你的登录密码" \
-  -e RUN_ON_START="false" \
   -v $(pwd)/logs:/var/log/meituan \
+  -v $(pwd)/data:/app/data \
   ghcr.io/sortbyiky/meituan-coupons:latest
 ```
 
@@ -67,6 +84,7 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
     volumes:
       - ./logs:/var/log/meituan
+      - ./data:/app/data
 EOF
 
 # 创建 .env 配置文件
@@ -111,28 +129,43 @@ curl -fsSL https://raw.githubusercontent.com/sortbyiky/meituan-coupons/main/inst
 
 ### 登录认证
 
-Web 控制台需要密码登录，默认密码为 `admin123`，**强烈建议修改**。
+Web 控制台需要密码登录，默认用户名为 `admin`，默认密码为 `admin123`，**强烈建议修改**。
 
-通过环境变量 `ADMIN_PASSWORD` 设置登录密码。
+通过环境变量 `ADMIN_PASSWORD` 设置初始登录密码。
 
-### 功能
+### 功能详解
 
-- **Token 管理**：
-  - 在线添加、编辑、删除 Token
-  - 支持直接粘贴美团 URL 或 Cookie，自动提取 Token
-  - 支持为每个 Token 添加备注（如账号名称）
+#### 📊 控制台（Dashboard）
+- 系统运行状态
+- 今日领取统计
+- 快速执行按钮
+- 最近活动记录
 
-- **领取历史**：
-  - 查看每次领取的详细记录
-  - 显示领取的优惠券名称、金额、有效期等
+#### 👤 账号管理
+- 在线添加、编辑、删除 Token
+- 支持直接粘贴美团 URL 或 Cookie，自动提取 Token
+- 支持为每个 Token 添加备注（如账号名称）
+- 账号状态监控（活跃/禁用）
 
-- **实时日志**：
-  - 查看执行日志，支持自动刷新
-  - 日志语法高亮（成功/失败/信息）
+#### 📋 领取历史
+- 查看每次领取的详细记录
+- 显示领取的优惠券名称、金额、有效期等
+- 支持按日期筛选
 
-- **手动执行**：
-  - 点击按钮立即执行一次领取
-  - 清空日志记录
+#### 📝 系统日志
+- 完整操作日志
+- 支持按级别筛选（INFO/WARNING/ERROR）
+- 支持按类型筛选（认证/领取/系统/API）
+
+#### ⚙️ 系统设置
+- 修改定时执行时间
+- 修改登录密码
+- 系统参数配置
+
+#### ❓ 帮助教程
+- Token 获取详细教程
+- 常见问题解答
+- 使用指南
 
 ### Token 输入说明
 
@@ -159,7 +192,8 @@ Web 控制台需要密码登录，默认密码为 `admin123`，**强烈建议修
 
 - 响应式设计，支持手机访问
 - 自动刷新（状态 5 秒、日志 10 秒）
-- 简洁美观的界面
+- 现代化简洁界面
+- 多标签页管理
 
 ## 环境变量说明
 
@@ -171,6 +205,23 @@ Web 控制台需要密码登录，默认密码为 `admin123`，**强烈建议修
 | `RUN_ON_START` | 否 | `false` | 启动时是否立即执行一次 |
 | `ENABLE_WEB` | 否 | `true` | 是否启用 Web 控制台 |
 | `WEB_PORT` | 否 | `5000` | Web 控制台端口 |
+
+## 数据持久化
+
+系统使用 SQLite 数据库存储所有数据：
+
+| 数据类型 | 存储位置 |
+|----------|----------|
+| 用户账号 | `/app/data/meituan.db` |
+| Token 信息 | `/app/data/meituan.db` |
+| 领取历史 | `/app/data/meituan.db` |
+| 系统日志 | `/app/data/meituan.db` |
+| 系统配置 | `/app/data/meituan.db` |
+| 执行日志 | `/var/log/meituan/coupons.log` |
+
+确保正确挂载 volumes 以保留数据：
+- `./data:/app/data` - 数据库文件
+- `./logs:/var/log/meituan` - 执行日志
 
 ## Token 获取教程
 
@@ -230,6 +281,8 @@ AgGYIaHEzI-14y0HtXaEk2ugpWQkAF-chI_TJ8W51Cbj...
 MEITUAN_TOKEN="token1&token2&token3"
 ```
 
+或者通过 Web 控制台的账号管理页面单独添加每个账号。
+
 ## 常用命令
 
 ```bash
@@ -254,6 +307,9 @@ docker-compose up -d
 
 # 查看执行记录
 cat logs/coupons.log
+
+# 备份数据库
+cp data/meituan.db data/meituan.db.backup
 ```
 
 ## 执行时间说明
@@ -270,7 +326,7 @@ cat logs/coupons.log
 
 ### Q: Token 多久失效？
 
-A: Token 有效期约 30 天，失效后需要重新获取并更新环境变量。
+A: Token 有效期约 30 天，失效后需要重新获取并更新。
 
 ### Q: 提示"请求异常"怎么办？
 
@@ -285,7 +341,7 @@ A:
 
 **方式一（推荐）：通过 Web 控制台**
 1. 访问 Web 控制台并登录
-2. 在 Token 管理页面添加、编辑或删除 Token
+2. 在账号管理页面添加、编辑或删除 Token
 3. 支持直接粘贴美团 URL 或 Cookie，自动提取
 
 **方式二：修改环境变量**
@@ -315,6 +371,29 @@ A: 设置环境变量 `ENABLE_WEB=false` 即可禁用 Web 控制台。
 ### Q: 如何修改 Web 控制台端口？
 
 A: 设置环境变量 `WEB_PORT=8080`（或其他端口），同时修改端口映射 `-p 8080:8080`。
+
+### Q: 数据如何备份？
+
+A: 定期备份 `data/meituan.db` 文件即可。
+
+## 技术架构
+
+```
+├── meituan.py          # 核心领取逻辑
+├── web.py              # Web 控制台（Flask）
+├── models.py           # 数据库模型（SQLAlchemy）
+├── entrypoint.sh       # Docker 入口脚本
+├── Dockerfile          # Docker 镜像构建
+├── docker-compose.yml  # Docker Compose 配置
+└── requirements.txt    # Python 依赖
+```
+
+**技术栈**：
+- Python 3.11
+- Flask + Flask-SQLAlchemy
+- SQLite 数据库
+- TailwindCSS + Remix Icons
+- Docker + Alpine Linux
 
 ## 免责声明
 

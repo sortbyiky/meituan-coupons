@@ -48,7 +48,7 @@ echo -e "${GREEN}Docker 环境正常${NC}"
 
 # 创建目录
 echo -e "${YELLOW}[2/4] 创建配置目录...${NC}"
-mkdir -p "$INSTALL_DIR/logs"
+mkdir -p "$INSTALL_DIR/logs" "$INSTALL_DIR/data"
 cd "$INSTALL_DIR"
 
 # 创建配置文件
@@ -97,6 +97,7 @@ services:
       - WEB_PORT=\${WEB_PORT:-5000}
     volumes:
       - ./logs:/var/log/meituan
+      - ./data:/app/data
 EOF
 
 echo -e "${GREEN}配置文件已创建${NC}"
@@ -129,6 +130,7 @@ else
         -e ENABLE_WEB="true" \
         -e WEB_PORT="5000" \
         -v "$INSTALL_DIR/logs:/var/log/meituan" \
+        -v "$INSTALL_DIR/data:/app/data" \
         "$IMAGE"
 fi
 
