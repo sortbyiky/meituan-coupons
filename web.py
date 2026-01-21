@@ -252,7 +252,7 @@ def api_add_account():
 
     token = extract_token(token_input)
     if not token:
-        return jsonify({"success": False, "message": "无法识别 Token"}), 400
+        return jsonify({"success": False, "message": "无法识别 Token，请粘贴包含 token= 的 Cookie 或完整 Token 值（以 Ag 开头的长字符串）"}), 400
 
     existing = MeituanAccount.query.filter_by(token=token, user_id=session['user_id']).first()
     if existing:
@@ -784,7 +784,7 @@ DASHBOARD_TEMPLATE = '''
             </div>
             <div class="p-4 space-y-3">
                 <div><label class="block text-sm text-slate-600 mb-1">账号名称</label><input type="text" id="account-name" class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm" placeholder="备注名"></div>
-                <div><label class="block text-sm text-slate-600 mb-1">Token</label><textarea id="account-token" rows="3" class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm" placeholder="粘贴 Token、Cookie 或 URL"></textarea></div>
+                <div><label class="block text-sm text-slate-600 mb-1">Token</label><textarea id="account-token" rows="3" class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm" placeholder="粘贴 Cookie 字符串（如 token=AgXXX...）或直接粘贴 Token 值"></textarea><p class="text-xs text-slate-400 mt-1">从浏览器开发者工具 Network → Cookie 中复制，需包含 token= 或直接复制 Token 值</p></div>
             </div>
             <div class="px-4 py-3 bg-slate-50 flex justify-end space-x-2">
                 <button onclick="hideAddAccountModal()" class="px-3 py-1.5 border border-slate-300 rounded text-sm hover:bg-slate-100">取消</button>
