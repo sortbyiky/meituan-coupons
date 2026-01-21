@@ -1,9 +1,24 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 .env
 .venv
 venv/
+
+# IDE
 .idea/
 .vscode/
+*.swp
+*.swo
+
+# Logs
 *.log
+logs/
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
+Thumbs.db

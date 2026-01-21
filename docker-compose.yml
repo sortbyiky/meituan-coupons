@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  meituan-coupons:
+    build: .
+    container_name: meituan-coupons
+    restart: unless-stopped
+    environment:
+      # 必填：美团 Token（从抓包获取）
+      - MEITUAN_TOKEN=${MEITUAN_TOKEN}
+      # 可选：定时执行的小时，默认 8,14（北京时间 8:00 和 14:00）
+      - CRON_HOURS=${CRON_HOURS:-8,14}
+      # 可选：启动时是否立即执行一次，设为 true 立即执行
+      - RUN_ON_START=${RUN_ON_START:-true}
+    volumes:
+      # 持久化日志
+      - ./logs:/var/log/meituan
