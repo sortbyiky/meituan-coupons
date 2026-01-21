@@ -46,6 +46,23 @@ fi
 
 echo ""
 echo "日志文件: ${LOG_FILE}"
+
+# Web 控制台
+WEB_PORT="${WEB_PORT:-5000}"
+ENABLE_WEB="${ENABLE_WEB:-true}"
+
+if [ "$ENABLE_WEB" = "true" ] || [ "$ENABLE_WEB" = "1" ]; then
+    echo ""
+    echo "=================================================="
+    echo "Web 控制台已启用"
+    echo "访问地址: http://localhost:${WEB_PORT}"
+    echo "=================================================="
+
+    # 后台启动 Web 服务
+    gunicorn -b 0.0.0.0:${WEB_PORT} -w 1 --timeout 120 web:app &
+fi
+
+echo ""
 echo "=================================================="
 echo "容器已启动，定时任务运行中..."
 echo "使用 docker logs -f 查看日志"

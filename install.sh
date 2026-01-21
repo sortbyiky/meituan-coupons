@@ -57,6 +57,10 @@ CRON_HOURS=8,14
 
 # 启动时立即执行一次
 RUN_ON_START=true
+
+# Web 控制台配置
+ENABLE_WEB=true
+WEB_PORT=5000
 EOF
 
 cat > "$INSTALL_DIR/docker-compose.yml" << EOF
@@ -66,10 +70,14 @@ services:
     image: $IMAGE
     container_name: meituan-coupons
     restart: unless-stopped
+    ports:
+      - "\${WEB_PORT:-5000}:5000"
     environment:
       - MEITUAN_TOKEN=\${MEITUAN_TOKEN}
       - CRON_HOURS=\${CRON_HOURS:-8,14}
       - RUN_ON_START=\${RUN_ON_START:-true}
+      - ENABLE_WEB=\${ENABLE_WEB:-true}
+      - WEB_PORT=\${WEB_PORT:-5000}
     volumes:
       - ./logs:/var/log/meituan
 EOF
@@ -96,9 +104,12 @@ else
     docker run -d \
         --name meituan-coupons \
         --restart unless-stopped \
+        -p 5000:5000 \
         -e MEITUAN_TOKEN="$TOKEN" \
         -e CRON_HOURS="8,14" \
         -e RUN_ON_START="true" \
+        -e ENABLE_WEB="true" \
+        -e WEB_PORT="5000" \
         -v "$INSTALL_DIR/logs:/var/log/meituan" \
         "$IMAGE"
 fi
@@ -111,6 +122,8 @@ echo ""
 echo "安装目录: $INSTALL_DIR"
 echo "镜像地址: $IMAGE"
 echo ""
+echo -e "${GREEN}Web 控制台: http://localhost:5000${NC}"
+echo ""
 echo "常用命令:"
 echo "  查看日志:   docker logs -f meituan-coupons"
 echo "  查看状态:   docker ps | grep meituan"
@@ -120,4 +133,5 @@ echo "  更新镜像:   docker pull $IMAGE && docker-compose -f $INSTALL_DIR/doc
 echo "  更新Token:  编辑 $INSTALL_DIR/.env 后执行 docker-compose restart"
 echo ""
 echo -e "${YELLOW}提示: 默认每天 8:00 和 14:00 自动执行${NC}"
+echo -e "${YELLOW}提示: Web 控制台可查看日志和手动触发执行${NC}"
 echo ""

@@ -1,6 +1,6 @@
 # 美团外卖红包自动领取
 
-基于 Docker 的美团外卖红包自动领取工具，支持一键部署到服务器。
+基于 Docker 的美团外卖红包自动领取工具，支持一键部署到服务器，内置 Web 控制台。
 
 ## 功能特性
 
@@ -8,6 +8,7 @@
 - 自动领取团购红包
 - 支持多账号（用 `&` 分隔）
 - 支持自定义执行时间
+- **Web 控制台**：查看日志、手动触发执行
 - Docker 一键部署，支持 amd64/arm64
 - 支持日志持久化
 
@@ -25,11 +26,14 @@ ghcr.io/sortbyiky/meituan-coupons:latest
 docker run -d \
   --name meituan-coupons \
   --restart unless-stopped \
+  -p 5000:5000 \
   -e MEITUAN_TOKEN="你的token值" \
   -e RUN_ON_START="true" \
   -v $(pwd)/logs:/var/log/meituan \
   ghcr.io/sortbyiky/meituan-coupons:latest
 ```
+
+启动后访问 http://localhost:5000 打开 Web 控制台。
 
 ### 方式二：Docker Compose（推荐）
 
@@ -46,10 +50,14 @@ services:
     image: ghcr.io/sortbyiky/meituan-coupons:latest
     container_name: meituan-coupons
     restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-5000}:5000"
     environment:
       - MEITUAN_TOKEN=${MEITUAN_TOKEN}
       - CRON_HOURS=${CRON_HOURS:-8,14}
       - RUN_ON_START=${RUN_ON_START:-true}
+      - ENABLE_WEB=${ENABLE_WEB:-true}
+      - WEB_PORT=${WEB_PORT:-5000}
     volumes:
       - ./logs:/var/log/meituan
 EOF
@@ -59,6 +67,8 @@ cat > .env << EOF
 MEITUAN_TOKEN=你的token值
 CRON_HOURS=8,14
 RUN_ON_START=true
+ENABLE_WEB=true
+WEB_PORT=5000
 EOF
 ```
 
@@ -68,17 +78,34 @@ EOF
 docker-compose up -d
 ```
 
-3. **查看日志**
+3. **访问 Web 控制台**
 
-```bash
-docker logs -f meituan-coupons
-```
+打开浏览器访问 http://localhost:5000
 
 ### 方式三：一键部署脚本
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sortbyiky/meituan-coupons/main/install.sh | bash -s -- "你的token值"
 ```
+
+## Web 控制台
+
+部署后访问 `http://服务器IP:5000` 即可打开 Web 控制台。
+
+### 功能
+
+- **查看执行状态**：当前状态、上次执行时间、执行结果
+- **查看日志**：实时查看领取日志，支持自动刷新
+- **手动执行**：点击按钮立即执行一次领取
+- **清空日志**：清除历史日志记录
+
+### 截图
+
+Web 控制台界面简洁美观，支持：
+- 实时状态显示
+- 日志语法高亮（成功/失败/信息）
+- 自动刷新（状态 5 秒、日志 10 秒）
+- 响应式设计，支持手机访问
 
 ## 环境变量说明
 
@@ -87,6 +114,8 @@ curl -fsSL https://raw.githubusercontent.com/sortbyiky/meituan-coupons/main/inst
 | `MEITUAN_TOKEN` | 是 | - | 美团 Token，多账号用 `&` 分隔 |
 | `CRON_HOURS` | 否 | `8,14` | 定时执行的小时（北京时间） |
 | `RUN_ON_START` | 否 | `true` | 启动时是否立即执行一次 |
+| `ENABLE_WEB` | 否 | `true` | 是否启用 Web 控制台 |
+| `WEB_PORT` | 否 | `5000` | Web 控制台端口 |
 
 ## Token 获取教程
 
@@ -220,6 +249,14 @@ A: 支持以下类型：
 ### Q: 支持哪些架构？
 
 A: 镜像支持 `linux/amd64` 和 `linux/arm64`，可在 x86 服务器和 ARM 服务器（如树莓派）上运行。
+
+### Q: 如何禁用 Web 控制台？
+
+A: 设置环境变量 `ENABLE_WEB=false` 即可禁用 Web 控制台。
+
+### Q: 如何修改 Web 控制台端口？
+
+A: 设置环境变量 `WEB_PORT=8080`（或其他端口），同时修改端口映射 `-p 8080:8080`。
 
 ## 免责声明
 
