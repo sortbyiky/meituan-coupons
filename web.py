@@ -11,13 +11,16 @@ from models import db, init_db, User, MeituanAccount, GrabHistory, SystemLog, Sy
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'meituan-coupons-secret-key-2024')
 
-DATA_DIR = os.environ.get('DATA_DIR', '/app/data')
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_DATA_DIR = '/app/data' if os.path.exists('/app') else os.path.join(SCRIPT_DIR, 'data')
+DATA_DIR = os.environ.get('DATA_DIR', DEFAULT_DATA_DIR)
 os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.environ.get('DB_PATH', f'{DATA_DIR}/meituan.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-LOG_FILE = '/var/log/meituan/coupons.log'
+DEFAULT_LOG_FILE = '/var/log/meituan/coupons.log' if os.path.exists('/var/log/meituan') else os.path.join(SCRIPT_DIR, 'coupons.log')
+LOG_FILE = os.environ.get('LOG_FILE', DEFAULT_LOG_FILE)
 
 
 def log_action(level: str, category: str, message: str, details: str = None):
@@ -304,7 +307,7 @@ def api_delete_account(account_id):
 @app.route('/api/grab/run', methods=['POST'])
 @login_required
 def api_run_grab():
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
     account_ids = data.get('account_ids', [])
 
     if session.get('is_admin'):
@@ -329,7 +332,9 @@ def api_run_grab():
         try:
             env = os.environ.copy()
             env['MEITUAN_TOKEN'] = account.token
-            result = subprocess.run(['python', '/app/meituan.py'], capture_output=True, text=True, timeout=120, env=env)
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            script_path = os.path.join(script_dir, 'meituan.py')
+            result = subprocess.run(['python', script_path], capture_output=True, text=True, timeout=120, env=env)
             output = result.stdout + result.stderr
             parsed = parse_grab_output(output)
 
@@ -471,88 +476,65 @@ LOGIN_TEMPLATE = '''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登录 - 美团红包管理系统</title>
+    <title>登录 - 美团红包</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-    <style>.gradient-bg{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)}</style>
 </head>
-<body class="gradient-bg min-h-screen flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-        <div class="text-center mb-8">
-            <div class="w-16 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full mx-auto flex items-center justify-center mb-4">
-                <i class="ri-coupon-3-fill text-white text-3xl"></i>
+<body class="bg-slate-100 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-md w-full max-w-sm p-6">
+        <div class="text-center mb-6">
+            <div class="w-12 h-12 bg-amber-500 rounded-lg mx-auto flex items-center justify-center mb-3">
+                <i class="ri-coupon-3-fill text-white text-2xl"></i>
             </div>
-            <h1 class="text-2xl font-bold text-gray-800">美团红包管理系统</h1>
-            <p class="text-gray-500 mt-2">多用户版</p>
+            <h1 class="text-xl font-semibold text-slate-800">美团红包</h1>
         </div>
-
         <div id="login-form">
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
-                    <input type="text" id="username" class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="请输入用户名">
+                    <label class="block text-sm text-slate-600 mb-1">用户名</label>
+                    <input type="text" id="username" class="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:border-slate-500" placeholder="用户名">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
-                    <input type="password" id="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="请输入密码">
+                    <label class="block text-sm text-slate-600 mb-1">密码</label>
+                    <input type="password" id="password" class="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:border-slate-500" placeholder="密码">
                 </div>
-                <button onclick="login()" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-medium hover:opacity-90">
-                    <i class="ri-login-box-line mr-2"></i>登录
-                </button>
+                <button onclick="login()" class="w-full bg-slate-800 text-white py-2 rounded hover:bg-slate-700">登录</button>
             </div>
-            <p class="mt-4 text-center text-gray-500 text-sm">没有账号？<a href="#" onclick="showRegister()" class="text-purple-600 hover:underline">立即注册</a></p>
+            <p class="mt-4 text-center text-slate-500 text-sm">没有账号？<a href="#" onclick="showRegister()" class="text-slate-800 hover:underline">注册</a></p>
         </div>
-
         <div id="register-form" class="hidden">
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
-                    <input type="text" id="reg-username" class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="至少3个字符">
+                    <label class="block text-sm text-slate-600 mb-1">用户名</label>
+                    <input type="text" id="reg-username" class="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:border-slate-500" placeholder="至少3个字符">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
-                    <input type="password" id="reg-password" class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="至少6个字符">
+                    <label class="block text-sm text-slate-600 mb-1">密码</label>
+                    <input type="password" id="reg-password" class="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:border-slate-500" placeholder="至少6个字符">
                 </div>
-                <button onclick="register()" class="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white py-3 rounded-lg font-medium hover:opacity-90">
-                    <i class="ri-user-add-line mr-2"></i>注册
-                </button>
+                <button onclick="register()" class="w-full bg-slate-800 text-white py-2 rounded hover:bg-slate-700">注册</button>
             </div>
-            <p class="mt-4 text-center text-gray-500 text-sm">已有账号？<a href="#" onclick="showLogin()" class="text-purple-600 hover:underline">返回登录</a></p>
+            <p class="mt-4 text-center text-slate-500 text-sm">已有账号？<a href="#" onclick="showLogin()" class="text-slate-800 hover:underline">登录</a></p>
         </div>
-
-        <div id="error" class="mt-4 p-3 bg-red-50 text-red-600 rounded-lg text-center hidden"></div>
-        <div id="success" class="mt-4 p-3 bg-green-50 text-green-600 rounded-lg text-center hidden"></div>
+        <div id="error" class="mt-4 p-2 bg-red-50 text-red-600 rounded text-center text-sm hidden"></div>
+        <div id="success" class="mt-4 p-2 bg-green-50 text-green-600 rounded text-center text-sm hidden"></div>
     </div>
-
     <script>
         function showRegister(){document.getElementById('login-form').classList.add('hidden');document.getElementById('register-form').classList.remove('hidden');hideMessages();}
         function showLogin(){document.getElementById('register-form').classList.add('hidden');document.getElementById('login-form').classList.remove('hidden');hideMessages();}
         function hideMessages(){document.getElementById('error').classList.add('hidden');document.getElementById('success').classList.add('hidden');}
         function showError(msg){hideMessages();document.getElementById('error').textContent=msg;document.getElementById('error').classList.remove('hidden');}
         function showSuccess(msg){hideMessages();document.getElementById('success').textContent=msg;document.getElementById('success').classList.remove('hidden');}
-
         async function login(){
-            const username=document.getElementById('username').value.trim();
-            const password=document.getElementById('password').value;
+            const username=document.getElementById('username').value.trim(),password=document.getElementById('password').value;
             if(!username||!password){showError('请填写完整');return;}
-            try{
-                const res=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
-                const data=await res.json();
-                if(data.success){window.location.href='/dashboard';}else{showError(data.message);}
-            }catch(e){showError('网络错误');}
+            try{const res=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});const data=await res.json();if(data.success){window.location.href='/dashboard';}else{showError(data.message);}}catch(e){showError('网络错误');}
         }
-
         async function register(){
-            const username=document.getElementById('reg-username').value.trim();
-            const password=document.getElementById('reg-password').value;
+            const username=document.getElementById('reg-username').value.trim(),password=document.getElementById('reg-password').value;
             if(!username||!password){showError('请填写完整');return;}
-            try{
-                const res=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
-                const data=await res.json();
-                if(data.success){showSuccess(data.message);setTimeout(showLogin,1500);}else{showError(data.message);}
-            }catch(e){showError('网络错误');}
+            try{const res=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});const data=await res.json();if(data.success){showSuccess(data.message);setTimeout(showLogin,1500);}else{showError(data.message);}}catch(e){showError('网络错误');}
         }
-
         document.addEventListener('keypress',e=>{if(e.key==='Enter'){if(!document.getElementById('login-form').classList.contains('hidden'))login();else register();}});
     </script>
 </body>
@@ -565,306 +547,261 @@ DASHBOARD_TEMPLATE = '''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>控制台 - 美团红包管理系统</title>
+    <title>美团红包</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <style>
-        .sidebar-item.active{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white}
-        .sidebar-item:hover:not(.active){background:#f3f4f6}
-        .card-shadow{box-shadow:0 4px 6px -1px rgba(0,0,0,0.1)}
-        .status-success{color:#10b981}.status-failed{color:#ef4444}.status-running{color:#f59e0b}
+        .sidebar-item.active{background:#1e293b;color:white}
+        .sidebar-item:hover:not(.active){background:#f1f5f9}
         .tab-content{display:none}.tab-content.active{display:block}
-        .log-line{font-family:Monaco,Menlo,monospace;font-size:12px}
-        .log-success{color:#10b981}.log-error{color:#ef4444}.log-warning{color:#f59e0b}.log-info{color:#3b82f6}
+        .status-success{color:#16a34a}.status-failed{color:#dc2626}.status-running{color:#ca8a04}
+        .log-success{color:#16a34a}.log-error{color:#dc2626}.log-warning{color:#ca8a04}.log-info{color:#2563eb}
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <nav class="bg-white shadow-sm fixed top-0 left-0 right-0 z-50">
-        <div class="flex items-center justify-between px-6 py-3">
+<body class="bg-slate-50 min-h-screen">
+    <nav class="bg-white border-b border-slate-200 fixed top-0 left-0 right-0 z-50">
+        <div class="flex items-center justify-between px-4 py-2">
             <div class="flex items-center">
-                <div class="w-10 h-10 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center mr-3">
-                    <i class="ri-coupon-3-fill text-white text-xl"></i>
+                <div class="w-8 h-8 bg-amber-500 rounded flex items-center justify-center mr-2">
+                    <i class="ri-coupon-3-fill text-white"></i>
                 </div>
-                <span class="text-xl font-bold text-gray-800">美团红包管理系统</span>
-                <span id="user-badge" class="ml-3 px-2 py-1 bg-purple-100 text-purple-600 text-xs rounded-full hidden">管理员</span>
+                <span class="font-semibold text-slate-800">美团红包</span>
+                <span id="user-badge" class="ml-2 px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded hidden">管理员</span>
             </div>
-            <div class="flex items-center space-x-4">
-                <span class="text-gray-600" id="current-user"><i class="ri-user-line mr-1"></i>加载中...</span>
-                <button onclick="logout()" class="text-gray-500 hover:text-red-500"><i class="ri-logout-box-line text-xl"></i></button>
+            <div class="flex items-center space-x-3">
+                <span class="text-sm text-slate-600" id="current-user">加载中...</span>
+                <button onclick="logout()" class="text-slate-400 hover:text-slate-600"><i class="ri-logout-box-line"></i></button>
             </div>
         </div>
     </nav>
-
-    <div class="flex pt-16">
-        <aside class="w-64 bg-white shadow-sm fixed left-0 top-16 bottom-0 overflow-y-auto">
-            <nav class="p-4 space-y-2">
-                <a href="#" onclick="showTab('dashboard')" class="sidebar-item active flex items-center px-4 py-3 rounded-lg" data-tab="dashboard">
-                    <i class="ri-dashboard-line text-xl mr-3"></i><span>仪表盘</span>
+    <div class="flex pt-12">
+        <aside class="w-48 bg-white border-r border-slate-200 fixed left-0 top-12 bottom-0">
+            <nav class="p-2 space-y-1">
+                <a href="#" onclick="showTab('dashboard')" class="sidebar-item active flex items-center px-3 py-2 rounded text-sm" data-tab="dashboard">
+                    <i class="ri-dashboard-line mr-2"></i>仪表盘
                 </a>
-                <a href="#" onclick="showTab('accounts')" class="sidebar-item flex items-center px-4 py-3 rounded-lg" data-tab="accounts">
-                    <i class="ri-account-circle-line text-xl mr-3"></i><span>账号管理</span>
+                <a href="#" onclick="showTab('accounts')" class="sidebar-item flex items-center px-3 py-2 rounded text-sm" data-tab="accounts">
+                    <i class="ri-account-circle-line mr-2"></i>账号管理
                 </a>
-                <a href="#" onclick="showTab('history')" class="sidebar-item flex items-center px-4 py-3 rounded-lg" data-tab="history">
-                    <i class="ri-history-line text-xl mr-3"></i><span>领取历史</span>
+                <a href="#" onclick="showTab('history')" class="sidebar-item flex items-center px-3 py-2 rounded text-sm" data-tab="history">
+                    <i class="ri-history-line mr-2"></i>领取历史
                 </a>
-                <a href="#" onclick="showTab('logs')" class="sidebar-item flex items-center px-4 py-3 rounded-lg" data-tab="logs">
-                    <i class="ri-file-text-line text-xl mr-3"></i><span>系统日志</span>
+                <a href="#" onclick="showTab('logs')" class="sidebar-item flex items-center px-3 py-2 rounded text-sm" data-tab="logs">
+                    <i class="ri-file-text-line mr-2"></i>系统日志
                 </a>
-                <a href="#" onclick="showTab('settings')" class="sidebar-item flex items-center px-4 py-3 rounded-lg" data-tab="settings">
-                    <i class="ri-settings-3-line text-xl mr-3"></i><span>系统设置</span>
+                <a href="#" onclick="showTab('settings')" class="sidebar-item flex items-center px-3 py-2 rounded text-sm" data-tab="settings">
+                    <i class="ri-settings-3-line mr-2"></i>系统设置
                 </a>
-                <a href="#" onclick="showTab('help')" class="sidebar-item flex items-center px-4 py-3 rounded-lg" data-tab="help">
-                    <i class="ri-question-line text-xl mr-3"></i><span>使用帮助</span>
+                <a href="#" onclick="showTab('help')" class="sidebar-item flex items-center px-3 py-2 rounded text-sm" data-tab="help">
+                    <i class="ri-question-line mr-2"></i>使用帮助
                 </a>
-                <div id="admin-menu" class="hidden pt-4 border-t border-gray-200 mt-4">
-                    <p class="px-4 text-xs text-gray-400 uppercase mb-2">管理员</p>
-                    <a href="#" onclick="showTab('users')" class="sidebar-item flex items-center px-4 py-3 rounded-lg" data-tab="users">
-                        <i class="ri-team-line text-xl mr-3"></i><span>用户管理</span>
+                <div id="admin-menu" class="hidden pt-2 mt-2 border-t border-slate-200">
+                    <a href="#" onclick="showTab('users')" class="sidebar-item flex items-center px-3 py-2 rounded text-sm" data-tab="users">
+                        <i class="ri-team-line mr-2"></i>用户管理
                     </a>
                 </div>
             </nav>
         </aside>
-
-        <main class="flex-1 ml-64 p-6">
+        <main class="flex-1 ml-48 p-4">
             <div id="tab-dashboard" class="tab-content active">
-                <div class="flex items-center justify-between mb-6">
-                    <h1 class="text-2xl font-bold text-gray-800">仪表盘</h1>
-                    <button onclick="runGrab()" class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-2 rounded-lg hover:opacity-90">
-                        <i class="ri-play-fill mr-2"></i>立即执行
+                <div class="flex items-center justify-between mb-4">
+                    <h1 class="text-lg font-semibold text-slate-800">仪表盘</h1>
+                    <button onclick="runGrab()" class="bg-slate-800 text-white px-4 py-1.5 rounded text-sm hover:bg-slate-700">
+                        <i class="ri-play-fill mr-1"></i>立即执行
                     </button>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                    <div class="bg-white rounded-xl p-6 card-shadow">
-                        <div class="flex items-center justify-between">
-                            <div><p class="text-gray-500 text-sm">我的账号</p><p class="text-3xl font-bold text-gray-800 mt-1" id="stat-accounts">-</p></div>
-                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center"><i class="ri-user-line text-blue-600 text-2xl"></i></div>
-                        </div>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <div class="bg-white rounded border border-slate-200 p-4">
+                        <p class="text-slate-500 text-xs">我的账号</p>
+                        <p class="text-2xl font-semibold text-slate-800 mt-1" id="stat-accounts">-</p>
                     </div>
-                    <div class="bg-white rounded-xl p-6 card-shadow">
-                        <div class="flex items-center justify-between">
-                            <div><p class="text-gray-500 text-sm">今日领取</p><p class="text-3xl font-bold text-green-600 mt-1" id="stat-today">-</p></div>
-                            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center"><i class="ri-gift-line text-green-600 text-2xl"></i></div>
-                        </div>
+                    <div class="bg-white rounded border border-slate-200 p-4">
+                        <p class="text-slate-500 text-xs">今日领取</p>
+                        <p class="text-2xl font-semibold text-green-600 mt-1" id="stat-today">-</p>
                     </div>
-                    <div class="bg-white rounded-xl p-6 card-shadow">
-                        <div class="flex items-center justify-between">
-                            <div><p class="text-gray-500 text-sm">累计领取</p><p class="text-3xl font-bold text-purple-600 mt-1" id="stat-total">-</p></div>
-                            <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center"><i class="ri-stack-line text-purple-600 text-2xl"></i></div>
-                        </div>
+                    <div class="bg-white rounded border border-slate-200 p-4">
+                        <p class="text-slate-500 text-xs">累计领取</p>
+                        <p class="text-2xl font-semibold text-slate-800 mt-1" id="stat-total">-</p>
                     </div>
-                    <div class="bg-white rounded-xl p-6 card-shadow">
-                        <div class="flex items-center justify-between">
-                            <div><p class="text-gray-500 text-sm">定时任务</p><p class="text-xl font-bold text-gray-800 mt-1" id="stat-cron">-</p></div>
-                            <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center"><i class="ri-time-line text-orange-600 text-2xl"></i></div>
-                        </div>
+                    <div class="bg-white rounded border border-slate-200 p-4">
+                        <p class="text-slate-500 text-xs">定时任务</p>
+                        <p class="text-lg font-semibold text-slate-800 mt-1" id="stat-cron">-</p>
                     </div>
                 </div>
-                <div class="bg-white rounded-xl card-shadow">
-                    <div class="px-6 py-4 border-b border-gray-100"><h2 class="text-lg font-semibold text-gray-800">最近领取记录</h2></div>
-                    <div class="p-6"><div id="recent-grabs" class="space-y-4"><p class="text-gray-500 text-center py-8">暂无记录</p></div></div>
+                <div class="bg-white rounded border border-slate-200">
+                    <div class="px-4 py-3 border-b border-slate-200"><h2 class="font-medium text-slate-800">最近记录</h2></div>
+                    <div class="p-4"><div id="recent-grabs" class="space-y-2"><p class="text-slate-400 text-center py-6 text-sm">暂无记录</p></div></div>
                 </div>
             </div>
 
             <div id="tab-accounts" class="tab-content">
-                <div class="flex items-center justify-between mb-6">
-                    <h1 class="text-2xl font-bold text-gray-800">账号管理</h1>
-                    <button onclick="showAddAccountModal()" class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-2 rounded-lg hover:opacity-90">
-                        <i class="ri-add-line mr-2"></i>添加账号
+                <div class="flex items-center justify-between mb-4">
+                    <h1 class="text-lg font-semibold text-slate-800">账号管理</h1>
+                    <button onclick="showAddAccountModal()" class="bg-slate-800 text-white px-4 py-1.5 rounded text-sm hover:bg-slate-700">
+                        <i class="ri-add-line mr-1"></i>添加账号
                     </button>
                 </div>
-                <div class="bg-white rounded-xl card-shadow">
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">账号名称</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Token</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">状态</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">最后执行</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="accounts-table" class="divide-y divide-gray-100">
-                                <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">加载中...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="bg-white rounded border border-slate-200">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">名称</th>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">Token</th>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">状态</th>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">最后执行</th>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accounts-table" class="divide-y divide-slate-100">
+                            <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">加载中...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-
             <div id="tab-history" class="tab-content">
-                <h1 class="text-2xl font-bold text-gray-800 mb-6">领取历史</h1>
-                <div class="bg-white rounded-xl card-shadow">
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">时间</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">账号</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">状态</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">成功/失败</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">详情</th>
-                                </tr>
-                            </thead>
-                            <tbody id="history-table" class="divide-y divide-gray-100">
-                                <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">加载中...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div id="history-pagination" class="px-6 py-4 border-t border-gray-100 flex items-center justify-between"></div>
+                <h1 class="text-lg font-semibold text-slate-800 mb-4">领取历史</h1>
+                <div class="bg-white rounded border border-slate-200">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">时间</th>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">账号</th>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">状态</th>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">成功/失败</th>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">详情</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table" class="divide-y divide-slate-100">
+                            <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                    <div id="history-pagination" class="px-4 py-2 border-t border-slate-200 flex items-center justify-between text-sm"></div>
                 </div>
             </div>
-
             <div id="tab-logs" class="tab-content">
-                <div class="flex items-center justify-between mb-6">
-                    <h1 class="text-2xl font-bold text-gray-800">系统日志</h1>
-                    <div class="flex items-center space-x-4">
-                        <select id="log-filter" onchange="loadLogs()" class="border border-gray-300 rounded-lg px-4 py-2">
+                <div class="flex items-center justify-between mb-4">
+                    <h1 class="text-lg font-semibold text-slate-800">系统日志</h1>
+                    <div class="flex items-center space-x-2">
+                        <select id="log-filter" onchange="loadLogs()" class="border border-slate-300 rounded px-2 py-1 text-sm">
                             <option value="">全部</option><option value="INFO">INFO</option><option value="WARNING">WARNING</option><option value="ERROR">ERROR</option>
                         </select>
-                        <button onclick="loadLogFile()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200"><i class="ri-refresh-line mr-2"></i>刷新</button>
+                        <button onclick="loadLogFile()" class="bg-slate-100 text-slate-600 px-3 py-1 rounded text-sm hover:bg-slate-200">刷新</button>
                     </div>
                 </div>
-                <div class="bg-white rounded-xl card-shadow mb-6">
-                    <div class="px-6 py-4 border-b border-gray-100"><h2 class="text-lg font-semibold text-gray-800">操作日志</h2></div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-gray-50">
-                                <tr><th class="px-6 py-3 text-left text-sm font-semibold text-gray-600">时间</th><th class="px-6 py-3 text-left text-sm font-semibold text-gray-600">级别</th><th class="px-6 py-3 text-left text-sm font-semibold text-gray-600">类别</th><th class="px-6 py-3 text-left text-sm font-semibold text-gray-600">消息</th></tr>
-                            </thead>
-                            <tbody id="logs-table" class="divide-y divide-gray-100 text-sm"><tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">加载中...</td></tr></tbody>
-                        </table>
-                    </div>
+                <div class="bg-white rounded border border-slate-200 mb-4">
+                    <div class="px-4 py-2 border-b border-slate-200"><span class="font-medium text-slate-800 text-sm">操作日志</span></div>
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 border-b border-slate-200">
+                            <tr><th class="px-4 py-2 text-left font-medium text-slate-600">时间</th><th class="px-4 py-2 text-left font-medium text-slate-600">级别</th><th class="px-4 py-2 text-left font-medium text-slate-600">类别</th><th class="px-4 py-2 text-left font-medium text-slate-600">消息</th></tr>
+                        </thead>
+                        <tbody id="logs-table" class="divide-y divide-slate-100"><tr><td colspan="4" class="px-4 py-6 text-center text-slate-400">加载中...</td></tr></tbody>
+                    </table>
                 </div>
-                <div class="bg-white rounded-xl card-shadow">
-                    <div class="px-6 py-4 border-b border-gray-100"><h2 class="text-lg font-semibold text-gray-800">执行日志</h2></div>
-                    <div class="p-4 bg-gray-900 rounded-b-xl max-h-96 overflow-y-auto"><pre id="log-file-content" class="text-gray-300 log-line whitespace-pre-wrap">加载中...</pre></div>
+                <div class="bg-white rounded border border-slate-200">
+                    <div class="px-4 py-2 border-b border-slate-200"><span class="font-medium text-slate-800 text-sm">执行日志</span></div>
+                    <div class="p-3 bg-slate-800 rounded-b max-h-64 overflow-y-auto"><pre id="log-file-content" class="text-slate-300 text-xs font-mono whitespace-pre-wrap">加载中...</pre></div>
                 </div>
             </div>
-
             <div id="tab-settings" class="tab-content">
-                <h1 class="text-2xl font-bold text-gray-800 mb-6">系统设置</h1>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="bg-white rounded-xl card-shadow">
-                        <div class="px-6 py-4 border-b border-gray-100"><h2 class="text-lg font-semibold text-gray-800">定时任务</h2></div>
-                        <div class="p-6 space-y-4">
+                <h1 class="text-lg font-semibold text-slate-800 mb-4">系统设置</h1>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="bg-white rounded border border-slate-200">
+                        <div class="px-4 py-2 border-b border-slate-200"><span class="font-medium text-slate-800 text-sm">定时任务</span></div>
+                        <div class="p-4 space-y-3">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">执行时间（小时）</label>
-                                <input type="text" id="config-cron-hours" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="8,14">
-                                <p class="text-xs text-gray-500 mt-1">多个小时用逗号分隔</p>
+                                <label class="block text-sm text-slate-600 mb-1">执行时间（小时）</label>
+                                <input type="text" id="config-cron-hours" class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm" placeholder="8,14">
+                                <p class="text-xs text-slate-400 mt-1">多个小时用逗号分隔</p>
                             </div>
-                            <button onclick="saveConfig()" id="save-config-btn" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">保存设置</button>
-                            <p id="admin-only-hint" class="text-xs text-gray-400 hidden">仅管理员可修改</p>
+                            <button onclick="saveConfig()" id="save-config-btn" class="bg-slate-800 text-white px-4 py-1.5 rounded text-sm hover:bg-slate-700">保存</button>
+                            <p id="admin-only-hint" class="text-xs text-slate-400 hidden">仅管理员可修改</p>
                         </div>
                     </div>
-                    <div class="bg-white rounded-xl card-shadow">
-                        <div class="px-6 py-4 border-b border-gray-100"><h2 class="text-lg font-semibold text-gray-800">修改密码</h2></div>
-                        <div class="p-6 space-y-4">
-                            <div><label class="block text-sm font-medium text-gray-700 mb-2">原密码</label><input type="password" id="old-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>
-                            <div><label class="block text-sm font-medium text-gray-700 mb-2">新密码</label><input type="password" id="new-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>
-                            <button onclick="changePassword()" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">修改密码</button>
+                    <div class="bg-white rounded border border-slate-200">
+                        <div class="px-4 py-2 border-b border-slate-200"><span class="font-medium text-slate-800 text-sm">修改密码</span></div>
+                        <div class="p-4 space-y-3">
+                            <div><label class="block text-sm text-slate-600 mb-1">原密码</label><input type="password" id="old-password" class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm"></div>
+                            <div><label class="block text-sm text-slate-600 mb-1">新密码</label><input type="password" id="new-password" class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm"></div>
+                            <button onclick="changePassword()" class="bg-slate-800 text-white px-4 py-1.5 rounded text-sm hover:bg-slate-700">修改</button>
                         </div>
                     </div>
                 </div>
             </div>
-
             <div id="tab-help" class="tab-content">
-                <h1 class="text-2xl font-bold text-gray-800 mb-6">使用帮助</h1>
-                <div class="space-y-6">
-                    <div class="bg-white rounded-xl card-shadow">
-                        <div class="px-6 py-4 border-b border-gray-100 flex items-center"><i class="ri-key-2-line text-2xl text-purple-600 mr-3"></i><h2 class="text-lg font-semibold text-gray-800">如何获取美团 Token</h2></div>
-                        <div class="p-6 space-y-6">
-                            <div class="border-l-4 border-purple-500 pl-4">
-                                <h3 class="font-semibold text-gray-800 mb-3"><span class="bg-purple-100 text-purple-600 px-2 py-1 rounded text-sm mr-2">方法一</span>手机抓包</h3>
-                                <div class="text-gray-600 space-y-2">
-                                    <p><strong>工具：</strong>安卓 HttpCanary / 苹果 Stream</p>
-                                    <ol class="list-decimal list-inside ml-4 space-y-1">
-                                        <li>安装抓包工具并配置证书</li>
-                                        <li>打开抓包，进入微信小程序「美团外卖」</li>
-                                        <li>随便点击页面产生请求</li>
-                                        <li>搜索 meituan.com 请求，找到 token 字段</li>
-                                    </ol>
-                                </div>
+                <h1 class="text-lg font-semibold text-slate-800 mb-4">使用帮助</h1>
+                <div class="space-y-4">
+                    <div class="bg-white rounded border border-slate-200">
+                        <div class="px-4 py-2 border-b border-slate-200"><span class="font-medium text-slate-800 text-sm">如何获取 Token</span></div>
+                        <div class="p-4 space-y-4 text-sm">
+                            <div class="border-l-2 border-amber-500 pl-3">
+                                <p class="font-medium text-slate-800 mb-2">方法一：手机抓包</p>
+                                <p class="text-slate-600">安卓用 HttpCanary，苹果用 Stream。打开抓包后进入微信美团外卖小程序，找到 meituan.com 请求中的 token 字段。</p>
                             </div>
-                            <div class="border-l-4 border-blue-500 pl-4">
-                                <h3 class="font-semibold text-gray-800 mb-3"><span class="bg-blue-100 text-blue-600 px-2 py-1 rounded text-sm mr-2">方法二</span>浏览器抓包</h3>
-                                <div class="text-gray-600 space-y-2">
-                                    <ol class="list-decimal list-inside ml-4 space-y-1">
-                                        <li>Chrome 按 F12 打开开发者工具</li>
-                                        <li>切换到 Network 标签</li>
-                                        <li>访问 h5.waimai.meituan.com 并登录</li>
-                                        <li>找到请求的 Cookie 中 token= 后面的值</li>
-                                    </ol>
-                                </div>
+                            <div class="border-l-2 border-slate-400 pl-3">
+                                <p class="font-medium text-slate-800 mb-2">方法二：浏览器抓包</p>
+                                <p class="text-slate-600">Chrome 按 F12，切换到 Network，访问 h5.waimai.meituan.com 登录后，找到请求 Cookie 中 token= 后面的值。</p>
                             </div>
-                            <div class="bg-gray-50 rounded-lg p-4">
-                                <p class="font-semibold text-gray-700 mb-2">Cookie 示例：</p>
-                                <code class="block bg-gray-800 text-green-400 p-3 rounded text-sm">token=AgGYIaHEzI-14y0...; other=xxx</code>
-                                <p class="text-gray-600 mt-2">复制 token= 后面到分号前的部分</p>
+                            <div class="bg-slate-50 rounded p-3">
+                                <p class="text-slate-600 mb-1">Cookie 示例：</p>
+                                <code class="block bg-slate-800 text-green-400 p-2 rounded text-xs">token=AgGYIaHEzI-14y0...; other=xxx</code>
                             </div>
                         </div>
                     </div>
-                    <div class="bg-white rounded-xl card-shadow">
-                        <div class="px-6 py-4 border-b border-gray-100 flex items-center"><i class="ri-question-answer-line text-2xl text-orange-600 mr-3"></i><h2 class="text-lg font-semibold text-gray-800">常见问题</h2></div>
-                        <div class="p-6 space-y-4">
-                            <div class="border-b border-gray-100 pb-4"><p class="font-medium text-gray-800">Q: Token 多久失效？</p><p class="text-gray-600 mt-1">A: 约 30 天，失效后重新获取。</p></div>
-                            <div class="border-b border-gray-100 pb-4"><p class="font-medium text-gray-800">Q: 提示"请求异常"？</p><p class="text-gray-600 mt-1">A: 服务器在海外（美团屏蔽）或 Token 失效。</p></div>
-                            <div><p class="font-medium text-gray-800">Q: 支持哪些红包？</p><p class="text-gray-600 mt-1">A: 外卖满减、神券、闪购、团购等。</p></div>
+                    <div class="bg-white rounded border border-slate-200">
+                        <div class="px-4 py-2 border-b border-slate-200"><span class="font-medium text-slate-800 text-sm">常见问题</span></div>
+                        <div class="p-4 space-y-3 text-sm">
+                            <div><p class="font-medium text-slate-800">Token 多久失效？</p><p class="text-slate-600">约 30 天</p></div>
+                            <div><p class="font-medium text-slate-800">提示请求异常？</p><p class="text-slate-600">服务器在海外或 Token 失效</p></div>
+                            <div><p class="font-medium text-slate-800">支持哪些红包？</p><p class="text-slate-600">外卖满减、神券、闪购、团购等</p></div>
                         </div>
                     </div>
                 </div>
             </div>
-
             <div id="tab-users" class="tab-content">
-                <h1 class="text-2xl font-bold text-gray-800 mb-6">用户管理</h1>
-                <div class="bg-white rounded-xl card-shadow">
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">用户名</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">角色</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">注册时间</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">最后登录</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="users-table" class="divide-y divide-gray-100"><tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">加载中...</td></tr></tbody>
-                        </table>
-                    </div>
+                <h1 class="text-lg font-semibold text-slate-800 mb-4">用户管理</h1>
+                <div class="bg-white rounded border border-slate-200">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">用户名</th>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">角色</th>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">注册时间</th>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">最后登录</th>
+                                <th class="px-4 py-2 text-left font-medium text-slate-600">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table" class="divide-y divide-slate-100"><tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">加载中...</td></tr></tbody>
+                    </table>
                 </div>
             </div>
         </main>
     </div>
-
     <div id="add-account-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-xl w-full max-w-lg mx-4">
-            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-800">添加账号</h3>
-                <button onclick="hideAddAccountModal()" class="text-gray-400 hover:text-gray-600"><i class="ri-close-line text-2xl"></i></button>
+        <div class="bg-white rounded-lg w-full max-w-md mx-4">
+            <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                <span class="font-medium text-slate-800">添加账号</span>
+                <button onclick="hideAddAccountModal()" class="text-slate-400 hover:text-slate-600"><i class="ri-close-line text-xl"></i></button>
             </div>
-            <div class="p-6 space-y-4">
-                <div><label class="block text-sm font-medium text-gray-700 mb-2">账号名称 *</label><input type="text" id="account-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="备注名"></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-2">Token *</label><textarea id="account-token" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="粘贴 Token、Cookie 或 URL"></textarea></div>
+            <div class="p-4 space-y-3">
+                <div><label class="block text-sm text-slate-600 mb-1">账号名称</label><input type="text" id="account-name" class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm" placeholder="备注名"></div>
+                <div><label class="block text-sm text-slate-600 mb-1">Token</label><textarea id="account-token" rows="3" class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm" placeholder="粘贴 Token、Cookie 或 URL"></textarea></div>
             </div>
-            <div class="px-6 py-4 bg-gray-50 flex justify-end space-x-3">
-                <button onclick="hideAddAccountModal()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100">取消</button>
-                <button onclick="addAccount()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">添加</button>
+            <div class="px-4 py-3 bg-slate-50 flex justify-end space-x-2">
+                <button onclick="hideAddAccountModal()" class="px-3 py-1.5 border border-slate-300 rounded text-sm hover:bg-slate-100">取消</button>
+                <button onclick="addAccount()" class="px-3 py-1.5 bg-slate-800 text-white rounded text-sm hover:bg-slate-700">添加</button>
             </div>
         </div>
     </div>
-
     <div id="detail-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden flex flex-col">
-            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-800">领取详情</h3>
-                <button onclick="hideDetailModal()" class="text-gray-400 hover:text-gray-600"><i class="ri-close-line text-2xl"></i></button>
+        <div class="bg-white rounded-lg w-full max-w-xl mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+            <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                <span class="font-medium text-slate-800">领取详情</span>
+                <button onclick="hideDetailModal()" class="text-slate-400 hover:text-slate-600"><i class="ri-close-line text-xl"></i></button>
             </div>
-            <div id="detail-content" class="p-6 overflow-y-auto flex-1"></div>
+            <div id="detail-content" class="p-4 overflow-y-auto flex-1 text-sm"></div>
         </div>
     </div>
-
-    <div id="toast" class="fixed top-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg hidden z-50 transition-all transform translate-x-full"><span id="toast-message"></span></div>
+    <div id="toast" class="fixed top-4 right-4 bg-slate-800 text-white px-4 py-2 rounded text-sm hidden z-50 transition-all transform translate-x-full"><span id="toast-message"></span></div>
 
     <script>
         let currentUser = null;
@@ -880,6 +817,7 @@ DASHBOARD_TEMPLATE = '''
 
         async function api(url, opts={}) {
             try {
+                if(opts.method==='POST'&&!opts.body)opts.body='{}';
                 const r=await fetch(url,{headers:{'Content-Type':'application/json',...opts.headers},...opts});
                 const d=await r.json();
                 if(r.status===401){window.location.href='/login';return null;}
@@ -926,16 +864,16 @@ DASHBOARD_TEMPLATE = '''
             document.getElementById('stat-total').textContent=s.total_grabs;
             document.getElementById('stat-cron').textContent=s.cron_hours+' 点';
             const c=document.getElementById('recent-grabs');
-            if(s.recent_grabs.length===0){c.innerHTML='<p class="text-gray-500 text-center py-8">暂无记录</p>';}
-            else{c.innerHTML=s.recent_grabs.map(g=>`<div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg"><div class="flex items-center"><div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-4"><i class="ri-user-line text-purple-600"></i></div><div><p class="font-medium text-gray-800">${g.account_name}</p><p class="text-sm text-gray-500">${g.grab_time}</p></div></div><div class="text-right"><span class="status-${g.status}">${g.status==='success'?'成功':'失败'}</span><p class="text-sm text-gray-500">成功 ${g.success_count} / 失败 ${g.failed_count}</p></div></div>`).join('');}
+            if(s.recent_grabs.length===0){c.innerHTML='<p class="text-slate-400 text-center py-6 text-sm">暂无记录</p>';}
+            else{c.innerHTML=s.recent_grabs.map(g=>`<div class="flex items-center justify-between p-3 bg-slate-50 rounded"><div><p class="font-medium text-slate-800 text-sm">${g.account_name}</p><p class="text-xs text-slate-500">${g.grab_time}</p></div><div class="text-right text-sm"><span class="status-${g.status}">${g.status==='success'?'成功':'失败'}</span><p class="text-xs text-slate-500">${g.success_count}/${g.failed_count}</p></div></div>`).join('');}
         }
 
         async function loadAccounts() {
             const d=await api('/api/accounts');
             if(!d||!d.success)return;
             const t=document.getElementById('accounts-table');
-            if(d.data.length===0){t.innerHTML='<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">暂无账号</td></tr>';}
-            else{t.innerHTML=d.data.map(a=>`<tr><td class="px-6 py-4 font-medium text-gray-800">${a.name}</td><td class="px-6 py-4"><code class="text-sm text-gray-500">${a.token}</code></td><td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs ${a.is_active?'bg-green-100 text-green-600':'bg-gray-100 text-gray-600'}">${a.is_active?'启用':'禁用'}</span></td><td class="px-6 py-4 text-sm text-gray-500">${a.last_run_at||'从未执行'}${a.last_run_status?` <span class="status-${a.last_run_status}">${a.last_run_status}</span>`:''}</td><td class="px-6 py-4"><button onclick="toggleAccount(${a.id},${!a.is_active})" class="text-blue-600 hover:text-blue-800 mr-3">${a.is_active?'禁用':'启用'}</button><button onclick="deleteAccount(${a.id},'${a.name}')" class="text-red-600 hover:text-red-800">删除</button></td></tr>`).join('');}
+            if(d.data.length===0){t.innerHTML='<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">暂无账号</td></tr>';}
+            else{t.innerHTML=d.data.map(a=>`<tr class="border-b border-slate-100"><td class="px-6 py-4 font-medium text-slate-800">${a.name}</td><td class="px-6 py-4"><code class="text-sm text-slate-500">${a.token}</code></td><td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs ${a.is_active?'bg-green-100 text-green-700':'bg-slate-100 text-slate-500'}">${a.is_active?'启用':'禁用'}</span></td><td class="px-6 py-4 text-sm text-slate-500">${a.last_run_at||'从未执行'}${a.last_run_status?` <span class="status-${a.last_run_status}">${a.last_run_status}</span>`:''}</td><td class="px-6 py-4"><button onclick="toggleAccount(${a.id},${!a.is_active})" class="text-slate-600 hover:text-slate-800 mr-3">${a.is_active?'禁用':'启用'}</button><button onclick="deleteAccount(${a.id},'${a.name}')" class="text-red-500 hover:text-red-700">删除</button></td></tr>`).join('');}
         }
 
         function showAddAccountModal(){document.getElementById('add-account-modal').classList.remove('hidden');document.getElementById('add-account-modal').classList.add('flex');}
@@ -956,21 +894,21 @@ DASHBOARD_TEMPLATE = '''
             const d=await api(`/api/history?page=${page}&per_page=20`);
             if(!d||!d.success)return;
             const t=document.getElementById('history-table');
-            if(d.data.length===0){t.innerHTML='<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">暂无记录</td></tr>';}
-            else{t.innerHTML=d.data.map(h=>`<tr><td class="px-6 py-4 text-sm text-gray-600">${h.grab_time}</td><td class="px-6 py-4 font-medium text-gray-800">${h.account_name}</td><td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs ${h.status==='success'?'bg-green-100 text-green-600':'bg-red-100 text-red-600'}">${h.status==='success'?'成功':'失败'}</span></td><td class="px-6 py-4 text-sm"><span class="text-green-600">${h.success_count}</span> / <span class="text-red-600">${h.failed_count}</span></td><td class="px-6 py-4"><button onclick="showDetail(${h.id})" class="text-blue-600 hover:text-blue-800 text-sm">查看详情</button></td></tr>`).join('');}
+            if(d.data.length===0){t.innerHTML='<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">暂无记录</td></tr>';}
+            else{t.innerHTML=d.data.map(h=>`<tr class="border-b border-slate-100"><td class="px-6 py-4 text-sm text-slate-500">${h.grab_time}</td><td class="px-6 py-4 font-medium text-slate-800">${h.account_name}</td><td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs ${h.status==='success'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${h.status==='success'?'成功':'失败'}</span></td><td class="px-6 py-4 text-sm"><span class="text-green-600">${h.success_count}</span> / <span class="text-red-500">${h.failed_count}</span></td><td class="px-6 py-4"><button onclick="showDetail(${h.id})" class="text-slate-600 hover:text-slate-800 text-sm">查看详情</button></td></tr>`).join('');}
             const p=d.pagination,pe=document.getElementById('history-pagination');
-            if(p.pages>1){pe.innerHTML=`<span class="text-sm text-gray-500">共 ${p.total} 条</span><div class="flex space-x-2">${p.page>1?`<button onclick="loadHistory(${p.page-1})" class="px-3 py-1 border rounded hover:bg-gray-100">上一页</button>`:''}<span class="px-3 py-1">${p.page}/${p.pages}</span>${p.page<p.pages?`<button onclick="loadHistory(${p.page+1})" class="px-3 py-1 border rounded hover:bg-gray-100">下一页</button>`:''}</div>`;}else{pe.innerHTML='';}
+            if(p.pages>1){pe.innerHTML=`<span class="text-sm text-slate-500">共 ${p.total} 条</span><div class="flex space-x-2">${p.page>1?`<button onclick="loadHistory(${p.page-1})" class="px-3 py-1 border border-slate-200 rounded hover:bg-slate-50">上一页</button>`:''}<span class="px-3 py-1 text-slate-600">${p.page}/${p.pages}</span>${p.page<p.pages?`<button onclick="loadHistory(${p.page+1})" class="px-3 py-1 border border-slate-200 rounded hover:bg-slate-50">下一页</button>`:''}</div>`;}else{pe.innerHTML='';}
         }
 
         function showDetail(id){
             const m=document.getElementById('detail-modal');m.classList.remove('hidden');m.classList.add('flex');
-            document.getElementById('detail-content').innerHTML='<p class="text-gray-500">加载中...</p>';
+            document.getElementById('detail-content').innerHTML='<p class="text-slate-400">加载中...</p>';
             api('/api/history?per_page=100').then(d=>{
                 if(d&&d.success){
                     const h=d.data.find(x=>x.id===id);
                     if(h){
-                        let details='';try{const cs=JSON.parse(h.details||'[]');details=cs.map(c=>`<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2"><span>${c.name}</span><span class="${c.status==='success'?'text-green-600':'text-red-600'}">${c.status==='success'?'成功':'失败'}</span></div>`).join('');}catch(e){}
-                        document.getElementById('detail-content').innerHTML=`<div class="space-y-4"><div class="grid grid-cols-2 gap-4"><div class="bg-gray-50 p-4 rounded-lg"><p class="text-sm text-gray-500">账号</p><p class="font-medium">${h.account_name}</p></div><div class="bg-gray-50 p-4 rounded-lg"><p class="text-sm text-gray-500">时间</p><p class="font-medium">${h.grab_time}</p></div><div class="bg-gray-50 p-4 rounded-lg"><p class="text-sm text-gray-500">成功</p><p class="font-medium text-green-600">${h.success_count}</p></div><div class="bg-gray-50 p-4 rounded-lg"><p class="text-sm text-gray-500">失败</p><p class="font-medium text-red-600">${h.failed_count}</p></div></div>${details?`<div><p class="font-medium mb-2">详情</p>${details}</div>`:''}${h.raw_output?`<div><p class="font-medium mb-2">输出</p><pre class="bg-gray-900 text-gray-300 p-4 rounded-lg text-sm overflow-x-auto max-h-60">${h.raw_output}</pre></div>`:''}</div>`;
+                        let details='';try{const cs=JSON.parse(h.details||'[]');details=cs.map(c=>`<div class="flex items-center justify-between p-3 bg-slate-50 rounded mb-2"><span class="text-slate-700">${c.name}</span><span class="${c.status==='success'?'text-green-600':'text-red-500'}">${c.status==='success'?'成功':'失败'}</span></div>`).join('');}catch(e){}
+                        document.getElementById('detail-content').innerHTML=`<div class="space-y-4"><div class="grid grid-cols-2 gap-3"><div class="bg-slate-50 p-3 rounded"><p class="text-xs text-slate-500">账号</p><p class="font-medium text-slate-800">${h.account_name}</p></div><div class="bg-slate-50 p-3 rounded"><p class="text-xs text-slate-500">时间</p><p class="font-medium text-slate-800">${h.grab_time}</p></div><div class="bg-slate-50 p-3 rounded"><p class="text-xs text-slate-500">成功</p><p class="font-medium text-green-600">${h.success_count}</p></div><div class="bg-slate-50 p-3 rounded"><p class="text-xs text-slate-500">失败</p><p class="font-medium text-red-500">${h.failed_count}</p></div></div>${details?`<div><p class="font-medium text-slate-700 mb-2">详情</p>${details}</div>`:''}${h.raw_output?`<div><p class="font-medium text-slate-700 mb-2">输出</p><pre class="bg-slate-800 text-slate-300 p-3 rounded text-sm overflow-x-auto max-h-60">${h.raw_output}</pre></div>`:''}</div>`;
                     }
                 }
             });
@@ -982,8 +920,8 @@ DASHBOARD_TEMPLATE = '''
             const d=await api(`/api/logs?level=${level}&per_page=50`);
             if(!d||!d.success)return;
             const t=document.getElementById('logs-table');
-            if(d.data.length===0){t.innerHTML='<tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">暂无日志</td></tr>';}
-            else{t.innerHTML=d.data.map(l=>`<tr><td class="px-6 py-3 text-gray-600">${l.created_at}</td><td class="px-6 py-3"><span class="log-${l.level.toLowerCase()}">${l.level}</span></td><td class="px-6 py-3 text-gray-600">${l.category}</td><td class="px-6 py-3 text-gray-800">${l.message}</td></tr>`).join('');}
+            if(d.data.length===0){t.innerHTML='<tr><td colspan="4" class="px-6 py-8 text-center text-slate-400">暂无日志</td></tr>';}
+            else{t.innerHTML=d.data.map(l=>`<tr class="border-b border-slate-100"><td class="px-6 py-3 text-slate-500 text-sm">${l.created_at}</td><td class="px-6 py-3"><span class="log-${l.level.toLowerCase()}">${l.level}</span></td><td class="px-6 py-3 text-slate-500">${l.category}</td><td class="px-6 py-3 text-slate-700">${l.message}</td></tr>`).join('');}
         }
 
         async function loadLogFile() {
@@ -1022,7 +960,7 @@ DASHBOARD_TEMPLATE = '''
             const d=await api('/api/admin/users');
             if(!d||!d.success)return;
             const t=document.getElementById('users-table');
-            t.innerHTML=d.data.map(u=>`<tr><td class="px-6 py-4 font-medium text-gray-800">${u.username}</td><td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs ${u.is_admin?'bg-purple-100 text-purple-600':'bg-gray-100 text-gray-600'}">${u.is_admin?'管理员':'普通用户'}</span></td><td class="px-6 py-4 text-sm text-gray-500">${u.created_at||'-'}</td><td class="px-6 py-4 text-sm text-gray-500">${u.last_login||'-'}</td><td class="px-6 py-4">${u.is_admin?'-':`<button onclick="deleteUser(${u.id},'${u.username}')" class="text-red-600 hover:text-red-800">删除</button>`}</td></tr>`).join('');
+            t.innerHTML=d.data.map(u=>`<tr class="border-b border-slate-100"><td class="px-6 py-4 font-medium text-slate-800">${u.username}</td><td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs ${u.is_admin?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-500'}">${u.is_admin?'管理员':'普通用户'}</span></td><td class="px-6 py-4 text-sm text-slate-500">${u.created_at||'-'}</td><td class="px-6 py-4 text-sm text-slate-500">${u.last_login||'-'}</td><td class="px-6 py-4">${u.is_admin?'-':`<button onclick="deleteUser(${u.id},'${u.username}')" class="text-red-500 hover:text-red-700">删除</button>`}</td></tr>`).join('');
         }
 
         async function deleteUser(id,name){if(!confirm(`确定删除用户 "${name}"？其所有账号和数据也会被删除！`))return;const d=await api(`/api/admin/users/${id}`,{method:'DELETE'});if(d&&d.success){showToast('删除成功','success');loadUsers();}else{showToast(d?.message||'删除失败','error');}}
