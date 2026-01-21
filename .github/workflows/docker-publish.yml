@@ -6,6 +6,8 @@ on:
     paths:
       - 'Dockerfile'
       - 'meituan.py'
+      - 'web.py'
+      - 'models.py'
       - 'entrypoint.sh'
       - 'requirements.txt'
       - '.github/workflows/docker-publish.yml'
