@@ -50,8 +50,10 @@ def grab_waimai_coupons(token):
         response = requests.post(url=url, json=data, headers=headers, timeout=30)
         result = response.json()
 
-        if 'data' in result and 'allCoupons' in result['data']:
-            coupons = result['data']['allCoupons']
+        # 检查返回数据是否有效
+        data_obj = result.get('data')
+        if data_obj and 'allCoupons' in data_obj:
+            coupons = data_obj['allCoupons']
             print(f"[外卖] 成功领取 {len(coupons)} 张优惠券")
             print("-" * 50)
             for coupon in coupons:
@@ -105,8 +107,10 @@ def grab_tuangou_coupons(token):
         response = requests.post(url=url, json=data, headers=headers, timeout=30)
         result = response.json()
 
-        if 'data' in result and 'allCoupons' in result['data']:
-            coupons = result['data']['allCoupons']
+        # 检查返回数据是否有效
+        data_obj = result.get('data')
+        if data_obj and 'allCoupons' in data_obj:
+            coupons = data_obj['allCoupons']
             print(f"[团购] 成功领取 {len(coupons)} 张优惠券")
             print("-" * 50)
             for coupon in coupons:
