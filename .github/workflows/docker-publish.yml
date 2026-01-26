@@ -6,6 +6,7 @@ on:
     paths:
       - 'Dockerfile'
       - 'meituan.py'
+      - 'cron_grab.py'
       - 'web.py'
       - 'models.py'
       - 'entrypoint.sh'
