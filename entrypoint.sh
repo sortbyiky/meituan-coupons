@@ -24,10 +24,12 @@ echo "定时执行时间: 每天 ${CRON_HOURS} 点"
 # 创建定时任务
 # 将环境变量写入文件供 cron 使用
 echo "MEITUAN_TOKEN=$MEITUAN_TOKEN" > /app/.env
+echo "DATA_DIR=/app/data" >> /app/.env
+echo "DB_PATH=/app/data/meituan.db" >> /app/.env
 
-# 创建 cron 任务
+# 创建 cron 任务 - 使用 cron_grab.py 从数据库读取账号
 CRON_SCHEDULE="0 ${CRON_HOURS} * * *"
-echo "${CRON_SCHEDULE} cd /app && export \$(cat /app/.env | xargs) && python meituan.py >> ${LOG_FILE} 2>&1" > /etc/crontabs/root
+echo "${CRON_SCHEDULE} cd /app && export \$(cat /app/.env | xargs) && python cron_grab.py >> ${LOG_FILE} 2>&1" > /etc/crontabs/root
 
 echo "定时任务已配置: ${CRON_SCHEDULE}"
 echo ""
@@ -36,7 +38,8 @@ echo ""
 if [ "$RUN_ON_START" = "true" ] || [ "$RUN_ON_START" = "1" ]; then
     echo "正在立即执行一次..."
     echo ""
-    python /app/meituan.py 2>&1 | tee -a ${LOG_FILE}
+    # 使用 cron_grab.py 从数据库读取账号执行
+    python /app/cron_grab.py 2>&1 | tee -a ${LOG_FILE}
     echo ""
     echo "首次执行完成，等待下次定时任务..."
 else

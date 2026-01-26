@@ -18,6 +18,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY meituan.py .
+COPY cron_grab.py .
 COPY models.py .
 COPY web.py .
 COPY entrypoint.sh .
