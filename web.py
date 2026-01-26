@@ -81,12 +81,16 @@ def extract_token(input_str: str) -> str:
 def parse_grab_output(output: str) -> dict:
     result = {'total': 0, 'success': 0, 'failed': 0, 'coupons': []}
     for line in output.split('\n'):
-        if '成功' in line or '领取' in line:
-            result['success'] += 1
-            result['coupons'].append({'name': line.strip(), 'status': 'success'})
-        elif '失败' in line or '错误' in line or '异常' in line:
+        line = line.strip()
+        if not line:
+            continue
+        # 先检查失败，因为"领取失败"同时包含"领取"和"失败"
+        if '失败' in line or '错误' in line or '异常' in line:
             result['failed'] += 1
-            result['coupons'].append({'name': line.strip(), 'status': 'failed'})
+            result['coupons'].append({'name': line, 'status': 'failed'})
+        elif '成功领取' in line:
+            result['success'] += 1
+            result['coupons'].append({'name': line, 'status': 'success'})
     result['total'] = result['success'] + result['failed']
     return result
 
